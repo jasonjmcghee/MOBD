@@ -1,4 +1,5 @@
 *.userprefs
+*.meta
 *.sln
 *.csproj
 .vs/
