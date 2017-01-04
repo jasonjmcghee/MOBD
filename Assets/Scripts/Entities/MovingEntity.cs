@@ -5,18 +5,22 @@ using System;
 
 namespace Completed
 {
-	public abstract class MovingEntity : MonoBehaviour
-	{
-		public float moveTime = 10f;
+	public abstract class MovingEntity : MonoBehaviour {
+        protected float speed = 1f;
+
+        public float moveTime = 10f;
 		private float inverseMoveTime;
 		public static float dampTime = 0.05f;
-		private static Vector3 velocity = Vector3.zero;
+        private Vector3 intendedVelocity = Vector3.zero;
+		private Vector3 velocity = Vector3.zero;
 		public LayerMask unitMovement;
 		private Vector3 targetPosition;
 		private Vector3 lastValidPosition;
+        protected Animation animation;
+        private Rigidbody2D body;
 
-		// Pathing
-		private List<Point> currentPath;
+        // Pathing
+        private List<Point> currentPath;
 		private Vector2 pathEnd;
 
 
@@ -27,31 +31,42 @@ namespace Completed
 			Right, Left
 		}
 
-		protected virtual void Start ()
-		{
+		protected virtual void Start () {
 			boxCollider = GetComponent <BoxCollider2D> ();
-			
+            body = GetComponent <Rigidbody2D> ();
 			inverseMoveTime = 1f / moveTime;
 
 			facing = Mathf.Round(transform.eulerAngles.y) == 0f ? Facing.Right : Facing.Left;
 			targetPosition = transform.position;
-			velocity = Vector2.zero;
+            intendedVelocity = Vector2.zero;
 			unitMovement =  ~((1 << LayerMask.NameToLayer ("Floor")) | (1 << LayerMask.NameToLayer("Units")));
-		}
+            StartIdleAnimation();
+        }
 
-		void FixedUpdate() {
-
+		protected void FixedUpdate() {
+            if (!body.velocity.Equals(Vector3.zero)) {
+                body.velocity = Vector3.zero;
+            }
 			Vector3 diff = targetPosition - transform.position;
-			if (velocity.magnitude >= diff.magnitude) {
+			if (intendedVelocity.magnitude >= diff.magnitude) {
 				transform.position += diff;
-				velocity = Vector3.zero;
+                intendedVelocity = Vector3.zero;
 				OnSuccessfulStep ();
-			} else if (velocity != Vector3.zero) {
-				transform.position += velocity;
-			}
-		}
+			} else if (intendedVelocity != Vector3.zero) {
+				transform.position += intendedVelocity;
+            }
 
-		protected bool Move (Vector3 target) {
+            if (intendedVelocity.x > 0 && facing != Facing.Right) {
+                transform.Rotate(new Vector3(transform.rotation.x, 180f));
+                facing = Facing.Right;
+            } else if (intendedVelocity.x < 0 && facing != Facing.Left) {
+                transform.Rotate(new Vector3(transform.rotation.x, 180f));
+                facing = Facing.Left;
+            }
+        }
+
+        protected bool Move (Vector3 target) {
+            StartWalkAnimation();
 			pathEnd = target;
 			currentPath = GetPathFor (target);
 			//OptimizeCurrentPath ();
@@ -59,11 +74,8 @@ namespace Completed
 			return true;
 		}
 		
-		protected void Step ()
-		{
+		protected void Step () {
 			Vector2 start = transform.position;
-
-			float speed = 1f;
 
 			Vector2 newPos;
 			if (currentPath.Count < 1 && CanMoveDirectlyBetween (Point.Create(transform.position), Point.Create(pathEnd))) {
@@ -78,22 +90,24 @@ namespace Completed
 
 			int xDir = Mathf.RoundToInt (length.x == 0f ? 0 : Mathf.Sign(length.x));
 			int yDir = Mathf.RoundToInt (length.y == 0f ? 0 : Mathf.Sign(length.y));
-			RotatePlayerAsNeeded(xDir, yDir);
+            RotateAsNeeded(xDir, yDir);
 
 			targetPosition = newPos;
 			Vector2 normDist = length.normalized;
-			velocity = new Vector2 (normDist.x * speed * inverseMoveTime * Time.fixedDeltaTime,
+            intendedVelocity = new Vector2 (normDist.x * speed * inverseMoveTime * Time.fixedDeltaTime,
 				normDist.y * speed * inverseMoveTime * Time.fixedDeltaTime);
 		}
 
 		protected virtual void OnSuccessfulStep() {
-			if (currentPath != null && currentPath.Count > 0) {
-				currentPath.RemoveAt (0);
-				if (currentPath.Count > 0) Step ();
-			}
+            if (currentPath != null && currentPath.Count > 0) {
+                currentPath.RemoveAt(0);
+                if (currentPath.Count > 0) Step();
+            } else {
+                StartIdleAnimation();
+            }
 		}
 
-		private void RotatePlayerAsNeeded(int xDir, int yDir) {
+		private void RotateAsNeeded(int xDir, int yDir) {
 			bool shouldFlip = (facing == Facing.Left && xDir > 0) || (facing == Facing.Right && xDir < 0);
 			if (shouldFlip) {
 				GetComponent<Rigidbody2D>().angularVelocity = 0;
@@ -208,11 +222,19 @@ namespace Completed
 			}
 		}
 
-		// Old / Unused stuff
+        private void StartWalkAnimation() {
+            animation.CrossFade("Move", 0.1f, PlayMode.StopAll);
+        }
 
-		// We raycast (while binary searching) to skip to the furthest possible!
-		// Idea is good, but flawed. Not used for now.
-		private int IndexOfFurthestDirectPointInCurrentPath(Point furthest, Vector2 start) {
+        private void StartIdleAnimation() {
+            animation.CrossFade("Idle", 0.1f, PlayMode.StopAll);
+        }
+
+        // Old / Unused stuff
+
+        // We raycast (while binary searching) to skip to the furthest possible!
+        // Idea is good, but flawed. Not used for now.
+        private int IndexOfFurthestDirectPointInCurrentPath(Point furthest, Vector2 start) {
 			Point currentFurthest = furthest;
 			Point pointStart = Point.Create(start);
 			// Find last point in path that has line of sight

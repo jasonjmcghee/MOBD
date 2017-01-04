@@ -9,7 +9,9 @@ namespace Completed {
         public int width;
         public int height;
         public Point entrance;
+        public Point alternateEntrace;
 		public Point entryWay;
+        private Direction entranceSide;
 
         public Room(Point origin, Size size) {
             this.x = origin.x;
@@ -44,8 +46,9 @@ namespace Completed {
 			}
 
 			room.entrance = possibleEntrances[Random.Range(0, possibleEntrances.Count)].Clone();
-			room.entryWay = room.FindEntryWay ();
-			possibleEntrances = null;
+            room.entryWay = room.FindEntryWay ();
+            room.alternateEntrace = room.GetAlternateEntrace();
+            possibleEntrances = null;
 
             return room;
 
@@ -65,9 +68,9 @@ namespace Completed {
         }
 
         public bool Overlaps(Room room) {
-            if (this.x > room.x + room.width || room.x > this.x + this.width) {
+            if (this.x > room.x + room.width + 1 || room.x > this.x + this.width + 1) {
                 return false;
-            } else if (this.y > room.y + room.height || room.y > this.y + this.height) {
+            } else if (this.y > room.y + room.height + 1 || room.y > this.y + this.height + 1) {
                 return false;
             }
             return true;
@@ -96,15 +99,30 @@ namespace Completed {
 
 		public Point FindEntryWay() {
 			if (this.entrance.x == this.x) {
+                this.entranceSide = Direction.West;
 				return new Point (this.entrance.x + 1, this.entrance.y);
 			} else if (this.entrance.x == this.x + this.width - 1) {
-				return new Point (this.entrance.x - 1, this.entrance.y);
+                this.entranceSide = Direction.East;
+                return new Point (this.entrance.x - 1, this.entrance.y);
 			} else if (this.entrance.y == this.y) {
-				return new Point (this.entrance.x, this.entrance.y + 1);
+                this.entranceSide = Direction.North;
+                return new Point (this.entrance.x, this.entrance.y + 1);
 			} else {
+                this.entranceSide = Direction.South;
 				return new Point (this.entrance.x, this.entrance.y - 1);
 			}
 		}
+
+        public Point GetAlternateEntrace() {
+            Point offset = null;
+            int diff = Random.Range(0, 1) >= 0.5f ? -1 : 1;
+            if (this.entranceSide == Direction.West || this.entranceSide == Direction.East) {
+                offset = new Point(0, IsCorner(this.entrance.x, this.entrance.y + diff) ? -diff : diff);
+            } else {
+                offset = new Point(IsCorner(this.entrance.x + diff, this.entrance.y) ? -diff : diff, 0);
+            }
+            return this.entrance + offset;
+        }
 
 		public override bool Equals (object obj) {
 			return ((Room)obj).x == this.x && ((Room)obj).y == this.y;

@@ -208,5 +208,13 @@ namespace Completed {
 		public static float PointEuclideanDistance(Point a, Point b) {
 			return a.EuclideanDistance(b);
 		}
+
+        public static Point operator +(Point p1, Point p2) {
+            return new Point(p1.x + p2.x, p1.y + p2.y);
+        }
+
+        public static Point operator -(Point p1, Point p2) {
+            return new Point(p1.x - p2.x, p1.y - p2.y);
+        }
     }
 }

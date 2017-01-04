@@ -23,7 +23,7 @@ namespace Completed {
         public static Size MapSize = new Size(width, height);
 		public Size map = BoardManager.MapSize;
         private SizeRange roomSize = new SizeRange(10, 25);
-		public GameObject player, boardHolder, cellTile, unexploredTile;
+		public GameObject player, genericEnemy, boardHolder, cellTile, unexploredTile;
 		public GameObject dungeonFloor;
         public GameObject[] floorTiles, wallTiles, outerWallTiles;
         private Dictionary<Point, int> dungeonTileLookup = new Dictionary<Point, int>();
@@ -85,6 +85,7 @@ namespace Completed {
 				Vector3 startingPosition = new Vector3 (this.map.width / 2, this.map.height / 2);
 				Instantiate (this.player, startingPosition, Quaternion.identity);
 				Loader.SetStartingPosition (startingPosition);
+                Instantiate(genericEnemy, new Vector3(10, 10, 0), Quaternion.identity);
 			} else {
 				InitializeTiles ();
 				if (mode == GameMode.Multi) {
@@ -184,7 +185,8 @@ namespace Completed {
         private List<Room> SetRoomTiles(List<Room> roomList, Point startPoint) {
             List<Point> walls = new List<Point>();
 			float minDistance = startPoint.ManhattanDistance(new Point(0, 0));
-            Point nearestEntrance = null;
+            Room roomWithNearestEntrance = null;
+            
             HashSet<Point> entrances = new HashSet<Point>();
 
             foreach (Room room in roomList) {
@@ -210,27 +212,45 @@ namespace Completed {
 				float dist = startPoint.ManhattanDistance(room.entrance);
                 if (dist < minDistance) {
                     minDistance = dist;
-                    nearestEntrance = room.entrance;
+                    roomWithNearestEntrance = room;
                 }
             }
 
-			List<Point> newPath = FastestRoute (startPoint, nearestEntrance);
-			foreach (Point step in newPath) {
-				SetFloorTile (step);
-			}
-
+            List<Point> path = SetFloorForPathToRoomEntrance(startPoint, roomWithNearestEntrance);
             foreach (Room room in roomList) {
-                int index = Random.Range(0, entrances.Count);
-				newPath = FastestRoute(room.entrance, newPath[index]);
-                foreach (Point step in newPath) {
-                    SetFloorTile(step);
-                }
-				SetFloorTile (room.entryWay);
+                path = SetFloorForPathToRoomEntrance(path[Random.Range(0, entrances.Count)], room);
             }
             return roomList;
         }
 
-		private List<Point> FastestRoute (Point start, Point target) {
+        private List<Point> SetFloorForPathToRoomEntrance(Point start, Room room) {
+            List<Point> newPath = FastestRoute(room.entrance, start);
+            Point prevStep = null;
+            Point prevAltStep = room.alternateEntrace;
+            Point prevDiff = null;
+
+            SetFloorTile(room.alternateEntrace);
+            foreach (Point step in newPath) {
+                if (prevStep != null) {
+                    Point delta = step - prevStep;
+
+                    if (prevDiff != null && !prevDiff.Equals(delta)) {
+                        // Handle case where we make a turn
+                    } else {
+                        prevAltStep += delta;
+                        SetFloorTile(prevAltStep);
+                    }
+                    prevDiff = delta;
+                }
+
+                SetFloorTile(step);
+                prevStep = step;
+            }
+            SetFloorTile(room.entryWay);
+            return newPath;
+        }
+
+        private List<Point> FastestRoute (Point start, Point target) {
 			return start.FindPathAStar (target, GetNeighbors, Point.PointManhattanDistance);
 		}
 
